@@ -1,0 +1,40 @@
+{
+  "name": "upring-pubsub",
+  "version": "0.0.1",
+  "description": "PubSub system built on top of upring",
+  "main": "pubsub.js",
+  "scripts": {
+    "test": "standard && tap test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcollina/upring-pubsub.git"
+  },
+  "keywords": [
+    "upring",
+    "gossip",
+    "membership",
+    "publish",
+    "subscribe",
+    "pubsub",
+    "tentacoli",
+    "consistent",
+    "hashring"
+  ],
+  "author": "Matteo Collina <hello@matteocollina.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mcollina/upring-pubsub/issues"
+  },
+  "homepage": "https://github.com/mcollina/upring-pubsub#readme",
+  "devDependencies": {
+    "pre-commit": "^1.1.2",
+    "standard": "^6.0.8",
+    "tap": "^5.7.0"
+  },
+  "dependencies": {
+    "mqemitter": "^1.0.0",
+    "qlobber": "^0.6.0",
+    "upring": "^0.2.0"
+  }
+}
