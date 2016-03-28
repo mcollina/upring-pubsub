@@ -35,6 +35,6 @@
   "dependencies": {
     "mqemitter": "^1.0.0",
     "qlobber": "^0.6.0",
-    "upring": "^0.2.0"
+    "upring": "^0.3.0"
   }
 }
