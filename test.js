@@ -2,7 +2,7 @@
 
 const test = require('tap').test
 const absTest = require('mqemitter/abstractTest')
-const max = 10
+const max = 1
 const UpringPubsub = require('.')
 
 // this serves as a base node
@@ -12,6 +12,7 @@ const peers = [main]
 
 main.upring.on('up', () => {
   let count = 0
+  const base = [main.whoami()]
 
   for (let i = 0; i < max; i++) {
     launch()
@@ -19,16 +20,19 @@ main.upring.on('up', () => {
 
   function launch () {
     const peer = UpringPubsub({
-      base: [main.whoami()]
+      base
     })
     peers.push(peer)
+    peer.upring.on('up', () => {
+      base.push(peer.whoami())
+    })
     peer.upring.on('up', latch)
   }
 
   function latch () {
     if (++count === max) {
       absTest({
-        builder: () => main,
+        builder: () => UpringPubsub({ base }),
         test: test
       })
     }
