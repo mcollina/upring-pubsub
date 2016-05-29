@@ -18,11 +18,17 @@ function UpRingPubSub (opts) {
   this._streams = new Map()
 
   this._ready = false
+  this.closed = false
 
   this.upring.add({
     ns,
     cmd: 'publish'
   }, (req, reply) => {
+    if (this.closed) {
+      reply(new Error('instance closing'))
+      return
+    }
+
     this._internal.emit(req.msg, reply)
   })
 
@@ -42,7 +48,10 @@ function UpRingPubSub (opts) {
     }
 
     // TODO handle stream closing
-    this._internal.on(req.topic, listener, reply)
+    this._internal.on(req.topic, listener, () => {
+      console.log('subscribe completed')
+      reply()
+    })
   })
 
   this.upring.on('up', () => {
@@ -82,13 +91,17 @@ UpRingPubSub.prototype.emit = function (msg, cb) {
     ns,
     key,
     msg
-  }, cb)
+  }, cb || noop)
 }
 
 function Receiver (mq) {
   this._mq = mq
+  this.count = 1
   Writable.call(this, {
     objectMode: true
+  })
+  this.on('pipe', (source) => {
+    this.source = source
   })
 }
 
@@ -106,6 +119,8 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
     return
   }
 
+  done = done || noop
+
   const key = extractBase(topic)
   if (!onMessage.__upWrap) {
     onMessage.__upWrap = (msg, cb) => {
@@ -113,11 +128,15 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
     }
   }
 
-  this._internal.on(topic, onMessage.__upWrap, done)
+  this._internal.on(topic, onMessage.__upWrap)
 
-  if (this._streams.has(topic) || this.upring.allocatedToMe(key)) {
-    // data is already flowing through this instance
-    // nothing to do
+  // data is already flowing through this instance
+  // nothing to do
+  if (this._streams.has(topic)) {
+    this._streams.get(topic).count++
+    done()
+    return
+  } else if (this.upring.allocatedToMe(key)) {
     done()
     return
   }
@@ -133,19 +152,17 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
     streams: {
       messages: receiver
     }
-  }, (err, res) => {
-    if (err) {
-      return done(err)
-    }
-
-    // TODO handle streams getting closed
-    const source = res.streams.messages
-    source.pipe(receiver)
-    done()
-  })
+  }, done)
 }
 
 UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
+  const stream = this._streams.get(topic)
+
+  if (stream && --stream.count === 0) {
+    stream.source.destroy()
+    this._streams.delete(topic)
+  }
+  this._internal.removeListener(topic, onMessage.__upWrap, done)
 }
 
 UpRingPubSub.prototype.close = function (cb) {
@@ -154,8 +171,19 @@ UpRingPubSub.prototype.close = function (cb) {
     this.upring.once('up', this.close.bind(this, cb))
     return
   }
-  this._internal.close()
-  this.upring.close(cb)
+
+  if (this.closed) {
+    cb()
+    return
+  }
+
+  this.closed = true
+
+  this.upring.close((err) => {
+    this._internal.close(() => {
+      cb(err)
+    })
+  })
 }
 
 function noop () {}
