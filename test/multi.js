@@ -1,68 +1,80 @@
 'use strict'
 
-const test = require('tap').test
-const absTest = require('mqemitter/abstractTest')
+const tap = require('tap')
 const max = 1
 const UpringPubsub = require('..')
 const steed = require('steed')
+const maxInt = Math.pow(2, 32) - 1
+const timeout = 6000
 
 let peers = null
 let base = null
 
-function boot (done) {
-  const main = UpringPubsub()
+const main = UpringPubsub()
 
-  main.upring.on('up', () => {
-    let count = 0
-    base = [main.whoami()]
-    peers = [main]
+main.upring.on('up', () => {
+  let count = 0
+  base = [main.whoami()]
+  peers = [main]
 
-    for (let i = 0; i < max; i++) {
-      launch()
+  for (let i = 0; i < max; i++) {
+    launch()
+  }
+
+  function launch () {
+    const peer = UpringPubsub({
+      base
+    })
+    peers.push(peer)
+    peer.upring.on('up', () => {
+      base.push(peer.whoami())
+    })
+    peer.upring.on('up', latch)
+  }
+
+  function latch () {
+    if (++count === max) {
+      tap.tearDown(() => {
+        steed.each(peers, (peer, cb) => {
+          peer.close(cb)
+        })
+      })
+      start(tap.test)
+    }
+  }
+})
+
+function start (test) {
+  test('pub sub on another instance', { timeout }, (t) => {
+    t.plan(3)
+
+    const instance = UpringPubsub({
+      base
+    })
+    t.tearDown(instance.close.bind(instance))
+
+    const expected = {
+      payload: { my: 'message' }
     }
 
-    function launch () {
-      const peer = UpringPubsub({
-        base
-      })
-      peers.push(peer)
-      peer.upring.on('up', () => {
-        base.push(peer.whoami())
-      })
-      peer.upring.on('up', latch)
-    }
+    instance.upring.on('up', function () {
+      let topic = 'hello'
 
-    function latch () {
-      if (++count === max) {
-        done()
+      for (let i = 0; i < maxInt && this.allocatedToMe(topic); i += 1) {
+        topic = 'hello' + i
       }
-    }
-  })
-}
 
-function myTest (name, func) {
-  test(name, (t) => {
-    boot(() => {
-      func(t)
+      expected.topic = topic
+
+      instance.on(topic, (msg, cb) => {
+        t.deepEqual(msg, expected, 'msg match')
+        cb()
+      }, (err) => {
+        t.error(err)
+        instance.emit(expected, function () {
+          t.pass('emitted')
+        })
+      })
     })
   })
 }
-
-absTest({
-  builder: () => {
-    const currentPeers = peers
-    const instance = peers.shift()
-    const oldClose = instance.close
-    instance.close = function (done) {
-      peers = null
-      console.log('received close for peer', this.whoami())
-      console.log('peers', currentPeers.map((peer) => peer.whoami()))
-      steed.each(currentPeers, (peer, cb) => peer.close(cb), () => {
-        console.log('calling close for current instance')
-        oldClose.call(this, done)
-      })
-    }
-    return instance
-  },
-  test: myTest
-})

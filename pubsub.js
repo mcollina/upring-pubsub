@@ -29,6 +29,8 @@ function UpRingPubSub (opts) {
       return
     }
 
+    console.log(this.whoami(), 'msg', req.msg)
+
     this._internal.emit(req.msg, reply)
   })
 
@@ -49,7 +51,6 @@ function UpRingPubSub (opts) {
 
     // TODO handle stream closing
     this._internal.on(req.topic, listener, () => {
-      console.log('subscribe completed')
       reply()
     })
   })
