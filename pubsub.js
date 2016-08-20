@@ -4,6 +4,7 @@ const UpRing = require('upring')
 const inherits = require('util').inherits
 const mqemitter = require('mqemitter')
 const streams = require('readable-stream')
+const steed = require('steed')
 const Writable = streams.Writable
 const ns = 'pubsub'
 
@@ -29,8 +30,6 @@ function UpRingPubSub (opts) {
       return
     }
 
-    console.log(this.whoami(), 'msg', req.msg)
-
     this._internal.emit(req.msg, reply)
   })
 
@@ -44,9 +43,15 @@ function UpRingPubSub (opts) {
       return reply(new Error('missing messages stream'))
     }
 
-    // TODO add deduplication counters
+    const upring = this.upring
+
     function listener (data, cb) {
-      stream.write(data, cb)
+      // nothing to do, we are not responsible for this
+      if (!upring.allocatedToMe(extractBase(data.topic))) {
+        cb()
+      } else {
+        stream.write(data, cb)
+      }
     }
 
     // TODO handle stream closing
@@ -69,9 +74,17 @@ function extractBase (topic) {
 
   if (levels.length < 2) {
     return topic
+  } else if (levels[1] === '#') {
+    return levels[0]
   } else {
     return levels[0] + '/' + levels[1]
   }
+}
+
+function hasLowWildCard (topic) {
+  const levels = topic.split('/')
+
+  return levels[0] === '#' || levels[1] === '#'
 }
 
 Object.defineProperty(UpRingPubSub.prototype, 'current', {
@@ -129,6 +142,8 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
     }
   }
 
+  let cmd = 'subscribe'
+
   this._internal.on(topic, onMessage.__upWrap)
 
   // data is already flowing through this instance
@@ -137,16 +152,42 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
     this._streams.get(topic).count++
     done()
     return
+  } else if (hasLowWildCard(topic)) {
+    const members = this.upring._hashring.swim.members(false)
+    const receiver = new Receiver(this._internal)
+    this._streams.set(topic, receiver)
+
+    receiver.setMaxListeners(0)
+
+    const req = {
+      cmd,
+      ns,
+      topic,
+      streams: {
+        messages: receiver
+      }
+    }
+
+    steed.each(members, (peer, cb) => {
+      let conn = this.upring.peerConn({
+        id: peer.host,
+        meta: peer.meta
+      })
+      conn.request(req, cb)
+    }, done)
+    return
   } else if (this.upring.allocatedToMe(key)) {
+    // the message will be published here
     done()
     return
   }
 
+  // normal case, we just need to go to a single instance
   const receiver = new Receiver(this._internal)
   this._streams.set(topic, receiver)
 
   this.upring.request({
-    cmd: 'subscribe',
+    cmd,
     ns,
     key,
     topic,

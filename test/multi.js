@@ -1,7 +1,7 @@
 'use strict'
 
 const tap = require('tap')
-const max = 1
+const max = 5
 const UpringPubsub = require('..')
 const steed = require('steed')
 const maxInt = Math.pow(2, 32) - 1
@@ -67,6 +67,105 @@ function start (test) {
       expected.topic = topic
 
       instance.on(topic, (msg, cb) => {
+        t.deepEqual(msg, expected, 'msg match')
+        cb()
+      }, (err) => {
+        t.error(err)
+        instance.emit(expected, function () {
+          t.pass('emitted')
+        })
+      })
+    })
+  })
+
+  test('deep single level wildcards', { timeout }, (t) => {
+    t.plan(3)
+
+    const instance = UpringPubsub({
+      base
+    })
+    t.tearDown(instance.close.bind(instance))
+
+    const expected = {
+      payload: { my: 'message' }
+    }
+
+    instance.upring.on('up', function () {
+      let topic = 'hello/0'
+
+      for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
+        topic = 'hello/' + i
+      }
+
+      expected.topic = topic + '/something'
+
+      instance.on(topic + '/+', (msg, cb) => {
+        t.deepEqual(msg, expected, 'msg match')
+        cb()
+      }, (err) => {
+        t.error(err)
+        instance.emit(expected, function () {
+          t.pass('emitted')
+        })
+      })
+    })
+  })
+
+  test('deep multi level wildcard', { timeout }, (t) => {
+    t.plan(3)
+
+    const instance = UpringPubsub({
+      base
+    })
+    t.tearDown(instance.close.bind(instance))
+
+    const expected = {
+      payload: { my: 'message' }
+    }
+
+    instance.upring.on('up', function () {
+      let topic = 'hello/0'
+
+      for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
+        topic = 'hello/' + i
+      }
+
+      expected.topic = topic
+
+      instance.on(topic + '/#', (msg, cb) => {
+        t.deepEqual(msg, expected, 'msg match')
+        cb()
+      }, (err) => {
+        t.error(err)
+        instance.emit(expected, function () {
+          t.pass('emitted')
+        })
+      })
+    })
+  })
+
+  test('2nd level multi level wildcard', { timeout }, (t) => {
+    t.plan(3)
+
+    const instance = UpringPubsub({
+      base
+    })
+    t.tearDown(instance.close.bind(instance))
+
+    const expected = {
+      payload: { my: 'message' }
+    }
+
+    instance.upring.on('up', function () {
+      let topic = 'hello/0'
+
+      for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
+        topic = 'hello/' + i
+      }
+
+      expected.topic = topic
+
+      instance.on('hello/#', (msg, cb) => {
         t.deepEqual(msg, expected, 'msg match')
         cb()
       }, (err) => {
