@@ -4,6 +4,7 @@ const UpRing = require('upring')
 const inherits = require('util').inherits
 const mqemitter = require('mqemitter')
 const streams = require('readable-stream')
+const eos = require('end-of-stream')
 const steed = require('steed')
 const Writable = streams.Writable
 const ns = 'pubsub'
@@ -54,8 +55,13 @@ function UpRingPubSub (opts) {
       }
     }
 
-    // TODO handle stream closing
+    // remove the subscription when the stream closes
+    eos(req.streams.messages, () => {
+      this._internal.removeListener(req.topic, listener)
+    })
+
     this._internal.on(req.topic, listener, () => {
+      // confirm the subscription
       reply()
     })
   })

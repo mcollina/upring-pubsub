@@ -34,6 +34,7 @@
     "tap": "^5.7.0"
   },
   "dependencies": {
+    "end-of-stream": "^1.1.0",
     "mqemitter": "^1.0.0",
     "qlobber": "^0.6.0",
     "readable-stream": "^2.1.4",
