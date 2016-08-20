@@ -84,7 +84,8 @@ function extractBase (topic) {
 function hasLowWildCard (topic) {
   const levels = topic.split('/')
 
-  return levels[0] === '#' || levels[1] === '#'
+  return levels[0] === '#' || levels[1] === '#' ||
+         levels[0] === '+' || levels[1] === '+'
 }
 
 Object.defineProperty(UpRingPubSub.prototype, 'current', {
