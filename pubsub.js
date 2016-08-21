@@ -9,6 +9,7 @@ const steed = require('steed')
 const counter = require('./lib/counter')
 const Writable = streams.Writable
 const ns = 'pubsub'
+const reParallel = require('fastparallel')()
 
 function UpRingPubSub (opts) {
   if (!(this instanceof UpRingPubSub)) {
@@ -145,9 +146,20 @@ function Receiver (mq) {
 
 inherits(Receiver, Writable)
 
-// TODO implement writev
-Receiver.prototype._write = function (chunk, enc, cb) {
-  this._mq.emit(chunk, cb)
+Receiver.prototype._writev = function (chunks, cb) {
+  reParallel(this, processMsg, chunks, cb)
+}
+
+Receiver.prototype._write = function (chunk, encoding, cb) {
+  this._writev([{
+    chunk,
+    encoding,
+    callback: noop
+  }], cb)
+}
+
+function processMsg (entry, cb) {
+  this._mq.emit(entry.chunk, cb)
 }
 
 UpRingPubSub.prototype.on = function (topic, onMessage, done) {
