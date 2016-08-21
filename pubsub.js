@@ -6,6 +6,7 @@ const mqemitter = require('mqemitter')
 const streams = require('readable-stream')
 const eos = require('end-of-stream')
 const steed = require('steed')
+const counter = require('./lib/counter')
 const Writable = streams.Writable
 const ns = 'pubsub'
 
@@ -34,6 +35,15 @@ function UpRingPubSub (opts) {
     this._internal.emit(req.msg, reply)
   })
 
+  const count = counter()
+
+  var lastTick = 0
+  var currTick = counter.max
+
+  const tick = function () {
+    currTick = count()
+  }
+
   this.upring.add({
     ns,
     cmd: 'subscribe'
@@ -47,11 +57,18 @@ function UpRingPubSub (opts) {
     const upring = this.upring
 
     function listener (data, cb) {
-      // nothing to do, we are not responsible for this
-      if (!upring.allocatedToMe(extractBase(data.topic))) {
+      if (lastTick === currTick) {
+        // this is a duplicate
+        cb()
+      } else if (!upring.allocatedToMe(extractBase(data.topic))) {
+        // nothing to do, we are not responsible for this
         cb()
       } else {
         stream.write(data, cb)
+        // magically detect duplicates, as they will be emitted
+        // in the same JS tick
+        lastTick = currTick
+        process.nextTick(tick)
       }
     }
 
@@ -130,7 +147,6 @@ inherits(Receiver, Writable)
 
 // TODO implement writev
 Receiver.prototype._write = function (chunk, enc, cb) {
-  // TODO implement deduplication
   this._mq.emit(chunk, cb)
 }
 

@@ -71,6 +71,7 @@ function start (test) {
     instance.upring.on('up', function () {
       let topic = 'hello'
 
+      // this is the instance upring
       for (let i = 0; i < maxInt && this.allocatedToMe(topic); i += 1) {
         topic = 'hello' + i
       }
