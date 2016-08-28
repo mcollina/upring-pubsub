@@ -154,6 +154,8 @@ function Receiver (mq, topic, key, upring) {
 
   // TODO avoid warning for now
   // refactor reconnect logic
+  // to alloacate a new stream
+  // for every reconnect
   this.setMaxListeners(0)
 
   this.on('pipe', function (source) {
@@ -164,16 +166,7 @@ function Receiver (mq, topic, key, upring) {
       return
     }
 
-    // TODO make this configurable and less magical
-    // this 200 is a magic number based on the default joinTimeout
-    // ot swim which is 300
-    eos(source, setTimeout.bind(null, resubscribe, 1000))
-
-    function onError (err) {
-      if (err) {
-        setTimeout(resubscribe, 200)
-      }
-    }
+    eos(source, resubscribe)
 
     function resubscribe () {
       if (!that._destroyed) {
@@ -186,7 +179,7 @@ function Receiver (mq, topic, key, upring) {
             streams: {
               messages: that
             }
-          }, onError)
+          }, resubscribe)
           return
         }
       }
