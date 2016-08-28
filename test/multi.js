@@ -305,4 +305,59 @@ function start (test) {
       })
     })
   })
+
+  test('move a deep subscription', { timeout: timeout * 2 }, (t) => {
+    t.plan(6)
+
+    const toKill = UpringPubsub({
+      base,
+      hashring: {
+        joinTimeout
+      }
+    })
+    t.tearDown(toKill.close.bind(toKill))
+
+    const another = UpringPubsub({
+      base,
+      hashring: {
+        joinTimeout
+      }
+    })
+    t.tearDown(another.close.bind(another))
+
+    const expected = {
+      payload: { my: 'message' }
+    }
+
+    toKill.upring.on('up', function () {
+      let topic = 'hello'
+
+      for (let i = 0; i < maxInt && !this.allocatedToMe(topic); i += 1) {
+        topic = 'hello' + i
+      }
+
+      expected.topic = topic
+
+      another.on(topic, (msg, cb) => {
+        t.deepEqual(msg, expected, 'msg match')
+        cb()
+      }, (err) => {
+        t.error(err)
+        main.emit(expected, function () {
+          t.pass('emitted')
+
+          toKill.close(function () {
+            t.pass('closed')
+
+            setTimeout(function () {
+              expected.payload = 'another'
+              main.emit(expected, function () {
+                t.pass('emitted')
+              })
+            }, 2000)
+          })
+        })
+      })
+    })
+  })
 }

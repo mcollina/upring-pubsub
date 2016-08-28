@@ -45,6 +45,8 @@ function UpRingPubSub (opts) {
     currTick = count()
   }
 
+  this._inboundStreams = new Set()
+
   this.upring.add({
     ns,
     cmd: 'subscribe'
@@ -53,6 +55,11 @@ function UpRingPubSub (opts) {
 
     if (!stream) {
       return reply(new Error('missing messages stream'))
+    }
+
+    if (this.closed) {
+      stream.end()
+      return reply(new Error('closing'))
     }
 
     const upring = this.upring
@@ -73,8 +80,11 @@ function UpRingPubSub (opts) {
       }
     }
 
+    this._inboundStreams.add(stream)
+
     // remove the subscription when the stream closes
-    eos(req.streams.messages, () => {
+    eos(stream, () => {
+      this._inboundStreams.delete(stream)
       this._internal.removeListener(req.topic, listener)
     })
 
@@ -133,18 +143,72 @@ UpRingPubSub.prototype.emit = function (msg, cb) {
   }, cb || noop)
 }
 
-function Receiver (mq) {
+function Receiver (mq, topic, key, upring) {
+  var that = this
+
   this._mq = mq
   this.count = 1
   Writable.call(this, {
     objectMode: true
   })
-  this.on('pipe', (source) => {
+
+  // TODO avoid warning for now
+  // refactor reconnect logic
+  this.setMaxListeners(0)
+
+  this.on('pipe', function (source) {
     this.source = source
+
+    if (this._destroyed) {
+      process.nextTick(source.destroy.bind(source))
+      return
+    }
+
+    // TODO make this configurable and less magical
+    // this 200 is a magic number based on the default joinTimeout
+    // ot swim which is 300
+    eos(source, setTimeout.bind(null, resubscribe, 1000))
+
+    function onError (err) {
+      if (err) {
+        setTimeout(resubscribe, 200)
+      }
+    }
+
+    function resubscribe () {
+      if (!that._destroyed) {
+        if (key) {
+          upring.request({
+            ns,
+            cmd: 'subscribe',
+            topic,
+            key,
+            streams: {
+              messages: that
+            }
+          }, onError)
+          return
+        }
+      }
+    }
   })
 }
 
 inherits(Receiver, Writable)
+
+Receiver.prototype.unsubscribe = function () {
+  if (this._destroyed) {
+    return
+  }
+
+  this._destroyed = true
+
+  if (this.source) {
+    this.source.destroy()
+  }
+
+  this.end()
+}
 
 Receiver.prototype._writev = function (chunks, cb) {
   reParallel(this, processMsg, chunks, cb)
@@ -189,7 +253,7 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
     return
   } else if (hasLowWildCard(topic)) {
     const members = this.upring._hashring.swim.members(false)
-    const receiver = new Receiver(this._internal)
+    const receiver = new Receiver(this._internal, topic, null, this.upring)
     this._streams.set(topic, receiver)
 
     receiver.setMaxListeners(0)
@@ -218,7 +282,7 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
   }
 
   // normal case, we just need to go to a single instance
-  const receiver = new Receiver(this._internal)
+  const receiver = new Receiver(this._internal, topic, key, this.upring)
   this._streams.set(topic, receiver)
 
   this.upring.request({
@@ -236,7 +300,7 @@ UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
   const stream = this._streams.get(topic)
 
   if (stream && --stream.count === 0) {
-    stream.source.destroy()
+    stream.unsubscribe()
     this._streams.delete(topic)
   }
   this._internal.removeListener(topic, onMessage.__upWrap, done)
@@ -254,10 +318,14 @@ UpRingPubSub.prototype.close = function (cb) {
     return
   }
 
+  this._streams.forEach((value, key) => {
+    value.unsubscribe()
+  })
+
   this.closed = true
 
-  this.upring.close((err) => {
-    this._internal.close(() => {
+  this._internal.close(() => {
+    this.upring.close((err) => {
       cb(err)
     })
   })
