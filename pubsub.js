@@ -45,8 +45,6 @@ function UpRingPubSub (opts) {
     currTick = count()
   }
 
-  this._inboundStreams = new Set()
-
   this.upring.add({
     ns,
     cmd: 'subscribe'
@@ -80,11 +78,27 @@ function UpRingPubSub (opts) {
       }
     }
 
-    this._inboundStreams.add(stream)
+    var untrack = noop
+
+    if (req.key) {
+      // close if the responsible peer changes
+      // and trigger the reconnection mechanism on
+      // the other side
+      untrack = this.upring.track(req.key, () => {
+        this._internal.removeListener(req.topic, listener)
+        if (stream.destroy) {
+          stream.destroy()
+        } else {
+          stream.end()
+        }
+      })
+    }
 
     // remove the subscription when the stream closes
     eos(stream, () => {
-      this._inboundStreams.delete(stream)
+      if (untrack) {
+        untrack()
+      }
       this._internal.removeListener(req.topic, listener)
     })
 
@@ -269,9 +283,21 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
     }, done)
     return
   } else if (this.upring.allocatedToMe(key)) {
+    onMessage.__untrack = this.upring.track(key, () => {
+      // resubscribe if it is moved to someone else
+      onMessage.__untrack = undefined
+      setImmediate(() => {
+        this.removeListener(topic, onMessage, () => {
+          this.on(topic, onMessage, () => {
+            // log this
+          })
+        })
+      })
+    })
     // the message will be published here
     done()
-    return
+
+    return this
   }
 
   // normal case, we just need to go to a single instance
@@ -287,10 +313,17 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
       messages: receiver
     }
   }, done)
+
+  return this
 }
 
 UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
   const stream = this._streams.get(topic)
+
+  if (onMessage.__untrack) {
+    onMessage.__untrack()
+    onMessage.__untrack = undefined
+  }
 
   if (stream && --stream.count === 0) {
     stream.unsubscribe()
