@@ -7,11 +7,13 @@ const steed = require('steed')
 const maxInt = Math.pow(2, 32) - 1
 const timeout = 6000
 const joinTimeout = 2000
+const logLevel = 'error'
 
 let peers = null
 let base = null
 
 const main = UpringPubsub({
+  logLevel,
   hashring: {
     joinTimeout
   }
@@ -29,6 +31,7 @@ main.upring.on('up', () => {
   function launch () {
     const peer = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -58,6 +61,7 @@ function start (test) {
 
     const instance = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -95,6 +99,7 @@ function start (test) {
 
     const instance = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -131,6 +136,7 @@ function start (test) {
 
     const instance = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -167,6 +173,7 @@ function start (test) {
 
     const instance = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -203,6 +210,7 @@ function start (test) {
 
     const instance = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -239,6 +247,7 @@ function start (test) {
 
     const instance = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -275,6 +284,7 @@ function start (test) {
 
     const instance = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -311,6 +321,7 @@ function start (test) {
 
     const toKill = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -319,6 +330,7 @@ function start (test) {
 
     const another = UpringPubsub({
       base,
+      logLevel,
       hashring: {
         joinTimeout
       }
@@ -330,10 +342,10 @@ function start (test) {
     }
 
     toKill.upring.on('up', function () {
-      let topic = 'hello'
+      let topic = 'hello/0'
 
       for (let i = 0; i < maxInt && !this.allocatedToMe(topic); i += 1) {
-        topic = 'hello' + i
+        topic = 'hello/' + i
       }
 
       expected.topic = topic

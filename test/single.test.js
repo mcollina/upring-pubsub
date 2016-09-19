@@ -5,6 +5,10 @@ const absTest = require('mqemitter/abstractTest')
 const UpringPubsub = require('..')
 
 absTest({
-  builder: UpringPubsub,
+  builder: function (opts) {
+    opts = opts || {}
+    opts.logLevel = 'error'
+    return UpringPubsub(opts)
+  },
   test
 })

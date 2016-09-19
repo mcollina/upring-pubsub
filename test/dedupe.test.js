@@ -1,15 +1,10 @@
 'use strict'
 
 const t = require('tap')
-const UpringPubsub = require('..')
-const joinTimeout = 2000
+const UpringPubsub = require('./helper').build
 const maxInt = Math.pow(2, 32) - 1
 
-const main = UpringPubsub({
-  hashring: {
-    joinTimeout
-  }
-})
+const main = UpringPubsub()
 
 t.tearDown(main.close.bind(main))
 
@@ -18,12 +13,7 @@ t.plan(7)
 main.upring.on('up', () => {
   t.pass('main up')
 
-  const peer = UpringPubsub({
-    base: [main.whoami()],
-    hashring: {
-      joinTimeout
-    }
-  })
+  const peer = UpringPubsub(main)
 
   t.tearDown(peer.close.bind(peer))
 
@@ -59,7 +49,7 @@ main.upring.on('up', () => {
         main.emit(expected, function () {
           setTimeout(() => {
             t.pass('emitted')
-          }, 1000)
+          }, UpringPubsub.joinTimeout * 2)
         })
       })
     })

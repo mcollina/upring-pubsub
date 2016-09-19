@@ -1,15 +1,12 @@
 'use strict'
 
 const UpRing = require('upring')
-const inherits = require('util').inherits
 const mqemitter = require('mqemitter')
-const streams = require('readable-stream')
 const eos = require('end-of-stream')
-const steed = require('steed')
 const counter = require('./lib/counter')
-const Writable = streams.Writable
+const Receiver = require('./lib/receiver')
+const hyperid = require('hyperid')()
 const ns = 'pubsub'
-const reParallel = require('fastparallel')()
 
 function UpRingPubSub (opts) {
   if (!(this instanceof UpRingPubSub)) {
@@ -19,7 +16,7 @@ function UpRingPubSub (opts) {
   this.upring = new UpRing(opts)
   this._internal = mqemitter(opts)
 
-  this._streams = new Map()
+  this._receivers = new Map()
 
   this._ready = false
   this.closed = false
@@ -33,8 +30,12 @@ function UpRingPubSub (opts) {
       return
     }
 
+    this.logger.debug(req, 'emitting')
     this._internal.emit(req.msg, reply)
   })
+
+  // expose the parent logger
+  this.logger = this.upring.logger
 
   const count = counter()
 
@@ -50,13 +51,20 @@ function UpRingPubSub (opts) {
     cmd: 'subscribe'
   }, (req, reply) => {
     const stream = req.streams && req.streams.messages
+    const logger = this.logger.child({
+      incomingSubscription: {
+        topic: req.topic,
+        key: req.key,
+        id: hyperid()
+      }
+    })
 
     if (!stream) {
       return reply(new Error('missing messages stream'))
     }
 
     if (this.closed) {
-      stream.end()
+      stream.destroy()
       return reply(new Error('closing'))
     }
 
@@ -64,12 +72,15 @@ function UpRingPubSub (opts) {
 
     function listener (data, cb) {
       if (lastTick === currTick) {
+        logger.debug(data, 'duplicate data')
         // this is a duplicate
         cb()
       } else if (!upring.allocatedToMe(extractBase(data.topic))) {
         // nothing to do, we are not responsible for this
+        logger.debug(data, 'not allocated here')
         cb()
       } else {
+        logger.debug(data, 'writing data')
         stream.write(data, cb)
         // magically detect duplicates, as they will be emitted
         // in the same JS tick
@@ -80,11 +91,14 @@ function UpRingPubSub (opts) {
 
     var untrack = noop
 
+    logger.info('subscribe')
+
     if (req.key) {
       // close if the responsible peer changes
       // and trigger the reconnection mechanism on
       // the other side
       untrack = this.upring.track(req.key, () => {
+        logger.info('moving subscription to new peer')
         this._internal.removeListener(req.topic, listener)
         if (stream.destroy) {
           stream.destroy()
@@ -96,6 +110,7 @@ function UpRingPubSub (opts) {
 
     // remove the subscription when the stream closes
     eos(stream, () => {
+      logger.info('stream closed')
       if (untrack) {
         untrack()
       }
@@ -149,88 +164,15 @@ UpRingPubSub.prototype.emit = function (msg, cb) {
   }
 
   const key = extractBase(msg.topic)
-  this.upring.request({
+  const data = {
     cmd: 'publish',
     ns,
     key,
     msg
-  }, cb || noop)
-}
-
-function Receiver (mq, topic, key, upring) {
-  var that = this
-
-  this._mq = mq
-  this.count = 1
-  Writable.call(this, {
-    objectMode: true
-  })
-
-  // TODO avoid warning for now
-  // refactor reconnect logic
-  // to alloacate a new stream
-  // for every reconnect
-  this.setMaxListeners(0)
-
-  this.on('pipe', function (source) {
-    this.source = source
-
-    if (this._destroyed) {
-      process.nextTick(source.destroy.bind(source))
-      return
-    }
-
-    eos(source, resubscribe)
-
-    function resubscribe () {
-      if (!that._destroyed) {
-        if (key) {
-          upring.request({
-            ns,
-            cmd: 'subscribe',
-            topic,
-            key,
-            streams: {
-              messages: that
-            }
-          }, resubscribe)
-          return
-        }
-      }
-    }
-  })
-}
-
-inherits(Receiver, Writable)
-
-Receiver.prototype.unsubscribe = function () {
-  if (this._destroyed) {
-    return
   }
 
-  this._destroyed = true
-
-  if (this.source) {
-    this.source.destroy()
-  }
-
-  this.end()
-}
-
-Receiver.prototype._writev = function (chunks, cb) {
-  reParallel(this, processMsg, chunks, cb)
-}
-
-Receiver.prototype._write = function (chunk, encoding, cb) {
-  this._writev([{
-    chunk,
-    encoding,
-    callback: noop
-  }], cb)
-}
-
-function processMsg (entry, cb) {
-  this._mq.emit(entry.chunk, cb)
+  this.logger.debug(data, 'sending request')
+  this.upring.request(data, cb || noop)
 }
 
 UpRingPubSub.prototype.on = function (topic, onMessage, done) {
@@ -248,77 +190,49 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
     }
   }
 
-  let cmd = 'subscribe'
-
   this._internal.on(topic, onMessage.__upWrap)
+
+  let peers = null
 
   // data is already flowing through this instance
   // nothing to do
-  if (this._streams.has(topic)) {
-    this._streams.get(topic).count++
-    done()
+  if (this._receivers.has(topic)) {
+    this.logger.info({ topic }, 'subscription already setup')
+    this._receivers.get(topic).count++
+    process.nextTick(done)
     return
   } else if (hasLowWildCard(topic)) {
-    const members = this.upring._hashring.swim.members(false)
-    const receiver = new Receiver(this._internal, topic, null, this.upring)
-    this._streams.set(topic, receiver)
-
-    receiver.setMaxListeners(0)
-
-    const req = {
-      cmd,
-      ns,
-      topic,
-      streams: {
-        messages: receiver
-      }
-    }
-
-    steed.each(members, (peer, cb) => {
-      let conn = this.upring.peerConn({
-        id: peer.host,
-        meta: peer.meta
-      })
-      conn.request(req, cb)
-    }, done)
-    return
+    peers = this.upring.peers(false)
   } else if (this.upring.allocatedToMe(key)) {
+    this.logger.info({ topic }, 'local subscription')
+
     onMessage.__untrack = this.upring.track(key, () => {
       // resubscribe if it is moved to someone else
       onMessage.__untrack = undefined
       setImmediate(() => {
         this.removeListener(topic, onMessage, () => {
           this.on(topic, onMessage, () => {
-            // log this
+            this.logger.info({ topic }, 'resubscribed because topic moved to another peer')
           })
         })
       })
     })
-    // the message will be published here
-    done()
+
+    process.nextTick(done)
 
     return this
   }
 
   // normal case, we just need to go to a single instance
-  const receiver = new Receiver(this._internal, topic, key, this.upring)
-  this._streams.set(topic, receiver)
-
-  this.upring.request({
-    cmd,
-    ns,
-    key,
-    topic,
-    streams: {
-      messages: receiver
-    }
-  }, done)
+  const receiver = new Receiver(this, topic, key, peers)
+  this._receivers.set(topic, receiver)
+  receiver.send(done)
 
   return this
 }
 
 UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
-  const stream = this._streams.get(topic)
+  const stream = this._receivers.get(topic)
 
   if (onMessage.__untrack) {
     onMessage.__untrack()
@@ -327,7 +241,7 @@ UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
 
   if (stream && --stream.count === 0) {
     stream.unsubscribe()
-    this._streams.delete(topic)
+    this._receivers.delete(topic)
   }
   this._internal.removeListener(topic, onMessage.__upWrap, done)
 }
@@ -344,7 +258,7 @@ UpRingPubSub.prototype.close = function (cb) {
     return
   }
 
-  this._streams.forEach((value, key) => {
+  this._receivers.forEach((value, key) => {
     value.unsubscribe()
   })
 

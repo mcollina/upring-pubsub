@@ -2,8 +2,8 @@
 
 const t = require('tap')
 const farmhash = require('farmhash')
-const UpringPubsub = require('..')
-const joinTimeout = 2000
+const UpringPubsub = require('./helper').build
+const joinTimeout = UpringPubsub.joinTimeout
 
 function getKey (one, two) {
   const onePoints = one._hashring.mymeta().points
@@ -40,12 +40,7 @@ function getKey (one, two) {
 }
 
 t.test('from A to B', (t) => {
-  const main = UpringPubsub({
-    hashring: {
-      joinTimeout
-    }
-  })
-
+  const main = UpringPubsub()
   t.tearDown(main.close.bind(main))
 
   t.plan(5)
@@ -53,12 +48,7 @@ t.test('from A to B', (t) => {
   main.upring.on('up', () => {
     t.pass('main up')
 
-    const peer = UpringPubsub({
-      hashring: {
-        joinTimeout
-      }
-    })
-
+    const peer = UpringPubsub()
     t.tearDown(peer.close.bind(peer))
 
     peer.upring.on('up', function () {
@@ -94,11 +84,7 @@ t.test('from A to B', (t) => {
 })
 
 t.test('from B to A', (t) => {
-  const main = UpringPubsub({
-    hashring: {
-      joinTimeout
-    }
-  })
+  const main = UpringPubsub()
 
   t.tearDown(main.close.bind(main))
 
@@ -107,11 +93,7 @@ t.test('from B to A', (t) => {
   main.upring.on('up', () => {
     t.pass('main up')
 
-    const peer = UpringPubsub({
-      hashring: {
-        joinTimeout
-      }
-    })
+    const peer = UpringPubsub()
 
     t.tearDown(peer.close.bind(peer))
 
@@ -147,11 +129,7 @@ t.test('from B to A', (t) => {
 })
 
 t.test('from A -> B, to A -> C', (t) => {
-  const main = UpringPubsub({
-    hashring: {
-      joinTimeout
-    }
-  })
+  const main = UpringPubsub()
 
   t.tearDown(main.close.bind(main))
 
@@ -160,23 +138,14 @@ t.test('from A -> B, to A -> C', (t) => {
   main.upring.on('up', () => {
     t.pass('main up')
 
-    const peer = UpringPubsub({
-      base: [main.upring.whoami()],
-      hashring: {
-        joinTimeout
-      }
-    })
+    const peer = UpringPubsub(main)
 
     t.tearDown(peer.close.bind(peer))
 
     peer.upring.on('up', function () {
       t.pass('peer up')
 
-      const peer2 = UpringPubsub({
-        hashring: {
-          joinTimeout
-        }
-      })
+      const peer2 = UpringPubsub()
 
       t.tearDown(peer2.close.bind(peer2))
 
