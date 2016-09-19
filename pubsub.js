@@ -21,6 +21,7 @@ function UpRingPubSub (opts) {
   this._ready = false
   this.closed = false
 
+  // Add command
   this.upring.add({
     ns,
     cmd: 'publish'
@@ -46,6 +47,7 @@ function UpRingPubSub (opts) {
     currTick = count()
   }
 
+  // Subscribe command
   this.upring.add({
     ns,
     cmd: 'subscribe'
@@ -70,6 +72,7 @@ function UpRingPubSub (opts) {
 
     const upring = this.upring
 
+    // the listener that we will pass to MQEmitter
     function listener (data, cb) {
       if (lastTick === currTick) {
         logger.debug(data, 'duplicate data')
@@ -126,12 +129,24 @@ function UpRingPubSub (opts) {
   this.upring.on('up', () => {
     this._ready = true
   })
+
+  this.upring.on('peerUp', (peer) => {
+    // TODO maybe we should keep track of the wildcard
+    // receivers in a list, and walk through there
+    for (let receiver in this._receivers) {
+      if (receiver.peers) {
+        receiver.peers.push(peer)
+        receiver.sendPeer(peer, 0, noop)
+      }
+    }
+  })
 }
 
 UpRingPubSub.prototype.whoami = function () {
   return this.upring.whoami()
 }
 
+// Extract the base topic if there is a wildcard
 function extractBase (topic) {
   const levels = topic.split('/')
 
@@ -144,6 +159,7 @@ function extractBase (topic) {
   }
 }
 
+// do we have a wildcard?
 function hasLowWildCard (topic) {
   const levels = topic.split('/')
 
@@ -232,17 +248,17 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
 }
 
 UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
-  const stream = this._receivers.get(topic)
+  const receiver = this._receivers.get(topic)
 
   if (onMessage.__untrack) {
     onMessage.__untrack()
     onMessage.__untrack = undefined
   }
 
-  if (stream && --stream.count === 0) {
-    stream.unsubscribe()
-    this._receivers.delete(topic)
+  if (receiver && --receiver.count === 0) {
+    receiver.unsubscribe()
   }
+
   this._internal.removeListener(topic, onMessage.__upWrap, done)
 }
 
