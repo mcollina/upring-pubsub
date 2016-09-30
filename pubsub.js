@@ -7,6 +7,8 @@ const counter = require('./lib/counter')
 const Receiver = require('./lib/receiver')
 const hyperid = require('hyperid')()
 const ns = 'pubsub'
+const untrack = Symbol('untrack')
+const upwrap = Symbol('upwrap')
 
 function UpRingPubSub (opts) {
   if (!(this instanceof UpRingPubSub)) {
@@ -200,13 +202,13 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
   done = done || noop
 
   const key = extractBase(topic)
-  if (!onMessage.__upWrap) {
-    onMessage.__upWrap = (msg, cb) => {
+  if (!onMessage[upwrap]) {
+    onMessage[upwrap] = (msg, cb) => {
       onMessage.call(this, msg, cb)
     }
   }
 
-  this._internal.on(topic, onMessage.__upWrap)
+  this._internal.on(topic, onMessage[upwrap])
 
   let peers = null
 
@@ -222,9 +224,9 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
   } else if (this.upring.allocatedToMe(key)) {
     this.logger.info({ topic }, 'local subscription')
 
-    onMessage.__untrack = this.upring.track(key, () => {
+    onMessage[untrack] = this.upring.track(key, () => {
       // resubscribe if it is moved to someone else
-      onMessage.__untrack = undefined
+      onMessage[untrack] = undefined
       setImmediate(() => {
         this.removeListener(topic, onMessage, () => {
           this.on(topic, onMessage, () => {
@@ -250,16 +252,16 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
 UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
   const receiver = this._receivers.get(topic)
 
-  if (onMessage.__untrack) {
-    onMessage.__untrack()
-    onMessage.__untrack = undefined
+  if (onMessage[untrack]) {
+    onMessage[untrack]()
+    onMessage[untrack] = undefined
   }
 
   if (receiver && --receiver.count === 0) {
     receiver.unsubscribe()
   }
 
-  this._internal.removeListener(topic, onMessage.__upWrap, done)
+  this._internal.removeListener(topic, onMessage[upwrap], done)
 }
 
 UpRingPubSub.prototype.close = function (cb) {
