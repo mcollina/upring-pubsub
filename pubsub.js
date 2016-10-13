@@ -99,19 +99,29 @@ function UpRingPubSub (opts) {
     logger.info('subscribe')
 
     if (req.key) {
-      // close if the responsible peer changes
-      // and trigger the reconnection mechanism on
-      // the other side
-      tracker = this.upring.track(req.key)
-      tracker.on('move', () => {
-        logger.info('moving subscription to new peer')
+      if (this.upring.allocatedToMe(req.key)) {
+        // close if the responsible peer changes
+        // and trigger the reconnection mechanism on
+        // the other side
+        tracker = this.upring.track(req.key)
+        tracker.on('move', () => {
+          logger.info('moving subscription to new peer')
+          this._internal.removeListener(req.topic, listener)
+          if (stream.destroy) {
+            stream.destroy()
+          } else {
+            stream.end()
+          }
+        })
+      } else {
+        logger.warn('unable to subscribe, not allocated here')
         this._internal.removeListener(req.topic, listener)
         if (stream.destroy) {
           stream.destroy()
         } else {
           stream.end()
         }
-      })
+      }
     }
 
     // remove the subscription when the stream closes
