@@ -1,12 +1,14 @@
-# upring-pubsub
+# UpRing-PubSub
 
 [![npm version][npm-badge]][npm-url]
 [![Build Status][travis-badge]][travis-url]
 [![Coverage Status][coveralls-badge]][coveralls-url]
 
 PubSub system built on top of an [UpRing][upring] consistent hashring.
-See [MQEmitter][mqemitter] for the actual
-API.
+UpRingPubSub is consistently available, so it can lose messages when the topology changes.
+However, it is massively scalable.
+
+See [MQEmitter][mqemitter] for the actual API.
 
 [![js-standard-style](https://raw.githubusercontent.com/feross/standard/master/badge.png)](https://github.com/feross/standard)
 
