@@ -1,4 +1,4 @@
-# UpRing-PubSub
+# UpRingPubSub
 
 [![npm version][npm-badge]][npm-url]
 [![Build Status][travis-badge]][travis-url]
