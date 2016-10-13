@@ -2,6 +2,7 @@
 
 const tap = require('tap')
 const max = 5
+const UpRing = require('upring')
 const UpringPubsub = require('..')
 const steed = require('steed')
 const maxInt = Math.pow(2, 32) - 1
@@ -368,6 +369,50 @@ function start (test) {
               })
             }, 2000)
           })
+        })
+      })
+    })
+  })
+
+  test('works with a custom upring instance', { timeout }, (t) => {
+    t.plan(4)
+
+    const upring = new UpRing({
+      base,
+      logLevel,
+      hashring: {
+        joinTimeout
+      }
+    })
+
+    const instance = UpringPubsub({
+      upring
+    })
+    t.tearDown(instance.close.bind(instance))
+
+    const expected = {
+      payload: { my: 'message' }
+    }
+
+    t.equal(instance.upring, upring, 'upring istance is the same')
+
+    instance.upring.on('up', function () {
+      let topic = 'hello'
+
+      // this is the instance upring
+      for (let i = 0; i < maxInt && this.allocatedToMe(topic); i += 1) {
+        topic = 'hello' + i
+      }
+
+      expected.topic = topic
+
+      instance.on(topic, (msg, cb) => {
+        t.deepEqual(msg, expected, 'msg match')
+        cb()
+      }, (err) => {
+        t.error(err)
+        instance.emit(expected, function () {
+          t.pass('emitted')
         })
       })
     })

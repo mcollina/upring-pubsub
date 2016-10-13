@@ -15,7 +15,9 @@ function UpRingPubSub (opts) {
     return new UpRingPubSub(opts)
   }
 
-  this.upring = new UpRing(opts)
+  opts = opts || {}
+
+  this.upring = opts.upring || new UpRing(opts)
   this._internal = mqemitter(opts)
 
   this._receivers = new Map()
