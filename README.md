@@ -5,7 +5,7 @@
 [![Coverage Status][coveralls-badge]][coveralls-url]
 
 PubSub system built on top of an [UpRing][upring] consistent hashring.
-See [MQEmitter](http://github.com/mcollina/mqemitter) for the actual
+See [MQEmitter][mqemitter] for the actual
 API.
 
 [![js-standard-style](https://raw.githubusercontent.com/feross/standard/master/badge.png)](https://github.com/feross/standard)
@@ -21,9 +21,9 @@ npm i upring-pubsub
 ```js
 'use strict'
 
-const UpringPubsub = require('upring-pubsub')
+const UpRingPubsub = require('upring-pubsub')
 
-const broker = UpringPubsub({
+const broker = UpRingPubsub({
   base: process.argv.slice(2)
 })
 
@@ -49,6 +49,18 @@ setInterval(function () {
 }, 1000)
 ```
 
+## API
+
+### new UpRingPubSub(opts)
+
+All the options of [UpRing][upring] and [MQEmitter][mqemitter],
+combined.
+
+UpRingPubSub specific options:
+
+* `upring`: an already initialized `UpRing` instance that has not
+  already emitted `'up'`
+
 <a name="acknowledgements"></a>
 ## Acknowledgements
 
@@ -65,3 +77,4 @@ MIT
 [travis-badge]: https://api.travis-ci.org/mcollina/upring-pubsub.svg
 [travis-url]: https://travis-ci.org/mcollina/upring-pubsub
 [upring]: https://travis-ci.org/mcollina/upring
+[mqemitter]: http://github.com/mcollina/mqemitter

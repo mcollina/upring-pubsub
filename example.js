@@ -1,8 +1,8 @@
 'use strict'
 
-const UpringPubsub = require('.')
+const UpRingPubSub = require('.')
 
-const broker = UpringPubsub({
+const broker = UpRingPubSub({
   base: process.argv.slice(2)
 })
 
