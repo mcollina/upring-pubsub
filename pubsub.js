@@ -94,7 +94,7 @@ function UpRingPubSub (opts) {
       }
     }
 
-    var untrack = noop
+    var tracker
 
     logger.info('subscribe')
 
@@ -102,7 +102,8 @@ function UpRingPubSub (opts) {
       // close if the responsible peer changes
       // and trigger the reconnection mechanism on
       // the other side
-      untrack = this.upring.track(req.key, () => {
+      tracker = this.upring.track(req.key)
+      tracker.on('move', () => {
         logger.info('moving subscription to new peer')
         this._internal.removeListener(req.topic, listener)
         if (stream.destroy) {
@@ -116,8 +117,8 @@ function UpRingPubSub (opts) {
     // remove the subscription when the stream closes
     eos(stream, () => {
       logger.info('stream closed')
-      if (untrack) {
-        untrack()
+      if (tracker) {
+        tracker.end()
       }
       this._internal.removeListener(req.topic, listener)
     })
@@ -224,7 +225,7 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
   } else if (this.upring.allocatedToMe(key)) {
     this.logger.info({ topic }, 'local subscription')
 
-    onMessage[untrack] = this.upring.track(key, () => {
+    onMessage[untrack] = this.upring.track(key).on('move', () => {
       // resubscribe if it is moved to someone else
       onMessage[untrack] = undefined
       setImmediate(() => {
@@ -253,7 +254,7 @@ UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
   const receiver = this._receivers.get(topic)
 
   if (onMessage[untrack]) {
-    onMessage[untrack]()
+    onMessage[untrack].end()
     onMessage[untrack] = undefined
   }
 
