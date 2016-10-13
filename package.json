@@ -4,7 +4,9 @@
   "description": "PubSub system built on top of upring",
   "main": "pubsub.js",
   "scripts": {
-    "test": "standard && tap test/*.test.js"
+    "test": "standard | snazzy && tap test/*.test.js",
+    "coverage": "tap --cov --coverage-report=html test/*.test.js",
+    "coveralls": "tap test/*test.js --cov --coverage-report=text-lcov | coveralls"
   },
   "repository": {
     "type": "git",
@@ -28,8 +30,10 @@
   },
   "homepage": "https://github.com/mcollina/upring-pubsub#readme",
   "devDependencies": {
+    "coveralls": "^2.11.14",
     "farmhash": "^1.2.1",
     "pre-commit": "^1.1.2",
+    "snazzy": "^5.0.0",
     "standard": "^8.0.0",
     "steed": "^1.1.3",
     "tap": "^7.0.0"
