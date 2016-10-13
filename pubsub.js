@@ -146,7 +146,7 @@ function UpRingPubSub (opts) {
   this.upring.on('peerUp', (peer) => {
     // TODO maybe we should keep track of the wildcard
     // receivers in a list, and walk through there
-    for (let receiver in this._receivers) {
+    for (var receiver in this._receivers) {
       if (receiver.peers) {
         receiver.peers.push(peer)
         receiver.sendPeer(peer, 0, noop)
@@ -221,7 +221,7 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
 
   this._internal.on(topic, onMessage[upwrap])
 
-  let peers = null
+  var peers = null
 
   // data is already flowing through this instance
   // nothing to do
