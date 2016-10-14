@@ -3,7 +3,6 @@
 const UpRing = require('upring')
 const mqemitter = require('mqemitter')
 const eos = require('end-of-stream')
-const counter = require('./lib/counter')
 const Receiver = require('./lib/receiver')
 const hyperid = require('hyperid')()
 const ns = 'pubsub'
@@ -42,13 +41,10 @@ function UpRingPubSub (opts) {
   // expose the parent logger
   this.logger = this.upring.logger
 
-  const count = counter()
-
-  var lastTick = 0
-  var currTick = counter.max
+  const destSet = new Set()
 
   const tick = function () {
-    currTick = count()
+    destSet.clear()
   }
 
   // Subscribe command
@@ -65,11 +61,15 @@ function UpRingPubSub (opts) {
       }
     })
 
+    const dest = req.from
+
     if (!stream) {
+      logger.warn('no stream')
       return reply(new Error('missing messages stream'))
     }
 
     if (this.closed) {
+      logger.warn('ring closed')
       stream.destroy()
       return reply(new Error('closing'))
     }
@@ -78,7 +78,7 @@ function UpRingPubSub (opts) {
 
     // the listener that we will pass to MQEmitter
     function listener (data, cb) {
-      if (lastTick === currTick) {
+      if (destSet.has(dest)) {
         logger.debug(data, 'duplicate data')
         // this is a duplicate
         cb()
@@ -89,9 +89,9 @@ function UpRingPubSub (opts) {
       } else {
         logger.debug(data, 'writing data')
         stream.write(data, cb)
+        destSet.add(dest)
         // magically detect duplicates, as they will be emitted
         // in the same JS tick
-        lastTick = currTick
         process.nextTick(tick)
       }
     }

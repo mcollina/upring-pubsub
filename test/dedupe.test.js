@@ -35,13 +35,13 @@ main.upring.on('up', () => {
     expected.topic = topic
 
     main.on('#', function (msg, cb) {
-      t.deepEqual(msg, expected, 'msg match')
+      t.deepEqual(msg, expected, 'msg match 1')
       cb()
     }, (err) => {
       t.error(err)
 
       main.on('hello/+', function (msg, cb) {
-        t.deepEqual(msg, expected, 'msg match')
+        t.deepEqual(msg, expected, 'msg match 2')
         cb()
       }, (err) => {
         t.error(err)
