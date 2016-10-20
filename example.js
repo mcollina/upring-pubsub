@@ -3,7 +3,10 @@
 const UpRingPubSub = require('.')
 
 const broker = UpRingPubSub({
-  base: process.argv.slice(2)
+  base: process.argv.slice(2),
+  hashring: {
+    joinTimeout: 200
+  }
 })
 
 var count = 0
@@ -22,7 +25,7 @@ broker.upring.on('up', function () {
     broker.emit({
       topic: 'hello/world',
       count,
-      payload: `from ${process.pid}`
+      pid: process.pid
     })
   }, 1000)
 })

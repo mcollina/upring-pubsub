@@ -2,10 +2,9 @@
 
 const UpRing = require('upring')
 const mqemitter = require('mqemitter')
-const eos = require('end-of-stream')
 const Receiver = require('./lib/receiver')
-const hyperid = require('hyperid')()
-const ns = 'pubsub'
+const commands = require('./lib/commands')
+const extractBase = require('./lib/extractBase')
 const untrack = Symbol('untrack')
 const upwrap = Symbol('upwrap')
 
@@ -24,122 +23,10 @@ function UpRingPubSub (opts) {
   this._ready = false
   this.closed = false
 
-  // Add command
-  this.upring.add({
-    ns,
-    cmd: 'publish'
-  }, (req, reply) => {
-    if (this.closed) {
-      reply(new Error('instance closing'))
-      return
-    }
-
-    this.logger.debug(req, 'emitting')
-    this._internal.emit(req.msg, reply)
-  })
-
   // expose the parent logger
   this.logger = this.upring.logger
 
-  const destSet = new Set()
-
-  const tick = function () {
-    destSet.clear()
-  }
-
-  // Subscribe command
-  this.upring.add({
-    ns,
-    cmd: 'subscribe'
-  }, (req, reply) => {
-    const stream = req.streams && req.streams.messages
-    const logger = this.logger.child({
-      incomingSubscription: {
-        topic: req.topic,
-        key: req.key,
-        id: hyperid()
-      }
-    })
-
-    const dest = req.from
-
-    if (!stream) {
-      logger.warn('no stream')
-      return reply(new Error('missing messages stream'))
-    }
-
-    if (this.closed) {
-      logger.warn('ring closed')
-      stream.destroy()
-      return reply(new Error('closing'))
-    }
-
-    const upring = this.upring
-
-    // the listener that we will pass to MQEmitter
-    function listener (data, cb) {
-      if (destSet.has(dest)) {
-        logger.debug(data, 'duplicate data')
-        // this is a duplicate
-        cb()
-      } else if (!upring.allocatedToMe(extractBase(data.topic))) {
-        // nothing to do, we are not responsible for this
-        logger.debug(data, 'not allocated here')
-        cb()
-      } else {
-        logger.debug(data, 'writing data')
-        stream.write(data, cb)
-        destSet.add(dest)
-        // magically detect duplicates, as they will be emitted
-        // in the same JS tick
-        process.nextTick(tick)
-      }
-    }
-
-    var tracker
-
-    logger.info('subscribe')
-
-    if (req.key) {
-      if (this.upring.allocatedToMe(req.key)) {
-        // close if the responsible peer changes
-        // and trigger the reconnection mechanism on
-        // the other side
-        tracker = this.upring.track(req.key)
-        tracker.on('move', () => {
-          logger.info('moving subscription to new peer')
-          this._internal.removeListener(req.topic, listener)
-          if (stream.destroy) {
-            stream.destroy()
-          } else {
-            stream.end()
-          }
-        })
-      } else {
-        logger.warn('unable to subscribe, not allocated here')
-        this._internal.removeListener(req.topic, listener)
-        if (stream.destroy) {
-          stream.destroy()
-        } else {
-          stream.end()
-        }
-      }
-    }
-
-    // remove the subscription when the stream closes
-    eos(stream, () => {
-      logger.info('stream closed')
-      if (tracker) {
-        tracker.end()
-      }
-      this._internal.removeListener(req.topic, listener)
-    })
-
-    this._internal.on(req.topic, listener, () => {
-      // confirm the subscription
-      reply()
-    })
-  })
+  commands(this)
 
   this.upring.on('up', () => {
     this._ready = true
@@ -159,19 +46,6 @@ function UpRingPubSub (opts) {
 
 UpRingPubSub.prototype.whoami = function () {
   return this.upring.whoami()
-}
-
-// Extract the base topic if there is a wildcard
-function extractBase (topic) {
-  const levels = topic.split('/')
-
-  if (levels.length < 2) {
-    return topic
-  } else if (levels[1] === '#') {
-    return levels[0]
-  } else {
-    return levels[0] + '/' + levels[1]
-  }
 }
 
 // do we have a wildcard?
@@ -195,14 +69,15 @@ UpRingPubSub.prototype.emit = function (msg, cb) {
   }
 
   const key = extractBase(msg.topic)
+  const logger = this.logger
   const data = {
     cmd: 'publish',
-    ns,
+    ns: 'pubsub',
     key,
     msg
   }
 
-  this.logger.debug(data, 'sending request')
+  logger.debug(data, 'sending request')
   this.upring.request(data, cb || noop)
 }
 
