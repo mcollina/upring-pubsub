@@ -20,7 +20,7 @@ function UpRingPubSub (opts) {
 
   this._receivers = new Map()
 
-  this._ready = false
+  this.ready = false
   this.closed = false
 
   // expose the parent logger
@@ -29,7 +29,7 @@ function UpRingPubSub (opts) {
   commands(this)
 
   this.upring.on('up', () => {
-    this._ready = true
+    this.ready = true
   })
 
   this.upring.on('peerUp', (peer) => {
@@ -63,7 +63,7 @@ Object.defineProperty(UpRingPubSub.prototype, 'current', {
 })
 
 UpRingPubSub.prototype.emit = function (msg, cb) {
-  if (!this._ready) {
+  if (!this.ready) {
     this.upring.once('up', this.emit.bind(this, msg, cb))
     return
   }
@@ -82,7 +82,7 @@ UpRingPubSub.prototype.emit = function (msg, cb) {
 }
 
 UpRingPubSub.prototype.on = function (topic, onMessage, done) {
-  if (!this._ready) {
+  if (!this.ready) {
     this.upring.once('up', this.on.bind(this, topic, onMessage, done))
     return
   }
@@ -154,7 +154,7 @@ UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
 
 UpRingPubSub.prototype.close = function (cb) {
   cb = cb || noop
-  if (!this._ready) {
+  if (!this.ready) {
     this.upring.once('up', this.close.bind(this, cb))
     return
   }
