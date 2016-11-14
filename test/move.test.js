@@ -1,13 +1,13 @@
 'use strict'
 
 const tap = require('tap')
-const max = 5
+const max = 2
 const UpringPubsub = require('..')
 const steed = require('steed')
 const maxInt = Math.pow(2, 32) - 1
 const timeout = 6000
 const joinTimeout = 1000
-const logLevel = 'fatal'
+const logLevel = 'error'
 
 let peers = null
 let base = null
@@ -103,6 +103,7 @@ function start (test) {
 
         function removeListener () {
           if (count === 2 && emitted) {
+            t.comment('removing listener')
             another.removeListener(topic, listener, function () {
               t.pass('removed listener')
             })
@@ -116,13 +117,11 @@ function start (test) {
           if (peerDown === 2 && downPeer) {
             expected.payload = 'another'
             t.comment('emitting')
-            setTimeout(function () {
-              main.emit(expected, function () {
-                t.pass('emitted')
-                emitted = true
-                removeListener()
-              })
-            }, joinTimeout * 2)
+            main.emit(expected, function () {
+              t.pass('emitted')
+              emitted = true
+              removeListener()
+            })
           }
         }
 
@@ -143,11 +142,13 @@ function start (test) {
               emit()
             })
 
-            toKill.close(function () {
-              t.pass('closed')
-              downPeer = true
-              emit()
-            })
+            setTimeout(function () {
+              toKill.close(function () {
+                t.pass('closed')
+                downPeer = true
+                emit()
+              })
+            }, joinTimeout)
           })
         })
       })

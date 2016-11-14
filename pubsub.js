@@ -4,9 +4,11 @@ const UpRing = require('upring')
 const mqemitter = require('mqemitter')
 const Receiver = require('./lib/receiver')
 const commands = require('./lib/commands')
+const hasLowWildCard = require('./lib/hasLowWildCard')
 const extractBase = require('./lib/extractBase')
 const untrack = Symbol('untrack')
 const upwrap = Symbol('upwrap')
+const replicaSym = Symbol.for('replica')
 
 function UpRingPubSub (opts) {
   if (!(this instanceof UpRingPubSub)) {
@@ -30,6 +32,8 @@ function UpRingPubSub (opts) {
 
   this.upring.on('up', () => {
     this.ready = true
+    // expose the parent logger, with the child id set
+    this.logger = this.upring.logger
   })
 
   this.upring.on('peerUp', (peer) => {
@@ -46,14 +50,6 @@ function UpRingPubSub (opts) {
 
 UpRingPubSub.prototype.whoami = function () {
   return this.upring.whoami()
-}
-
-// do we have a wildcard?
-function hasLowWildCard (topic) {
-  const levels = topic.split('/')
-
-  return levels[0] === '#' || levels[1] === '#' ||
-         levels[0] === '+' || levels[1] === '+'
 }
 
 Object.defineProperty(UpRingPubSub.prototype, 'current', {
@@ -92,7 +88,11 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
   const key = extractBase(topic)
   if (!onMessage[upwrap]) {
     onMessage[upwrap] = (msg, cb) => {
-      onMessage.call(this, msg, cb)
+      if (!msg[replicaSym]) {
+        onMessage.call(this, msg, cb)
+      } else {
+        cb()
+      }
     }
   }
 
