@@ -42,6 +42,7 @@
     "end-of-stream": "^1.1.0",
     "hyperid": "^1.0.1",
     "mqemitter": "^2.0.2",
+    "pump": "^1.0.1",
     "qlobber": "^0.7.0",
     "readable-stream": "^2.2.1",
     "upring": "^0.14.4"
