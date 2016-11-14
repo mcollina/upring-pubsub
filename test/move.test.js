@@ -6,7 +6,7 @@ const UpringPubsub = require('..')
 const steed = require('steed')
 const maxInt = Math.pow(2, 32) - 1
 const timeout = 6000
-const joinTimeout = 500
+const joinTimeout = 1000
 const logLevel = 'fatal'
 
 let peers = null
@@ -88,20 +88,24 @@ function start (test) {
         for (let i = 0; i < maxInt && !this.allocatedToMe(topic); i += 1) {
           topic = 'hello/' + i
         }
+        // this topic is now allocated to toKill
 
         expected.topic = topic
         let count = 0
+        let emitted = false
 
         const listener = (msg, cb) => {
           count++
           t.deepEqual(msg, expected, 'msg match')
-          if (count === 2) {
+          removeListener()
+          cb()
+        }
+
+        function removeListener () {
+          if (count === 2 && emitted) {
             another.removeListener(topic, listener, function () {
               t.pass('removed listener')
-              cb()
             })
-          } else {
-            cb()
           }
         }
 
@@ -115,6 +119,8 @@ function start (test) {
             setTimeout(function () {
               main.emit(expected, function () {
                 t.pass('emitted')
+                emitted = true
+                removeListener()
               })
             }, joinTimeout * 2)
           }
