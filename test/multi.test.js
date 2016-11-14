@@ -340,11 +340,11 @@ function start (test) {
     t.equal(instance.upring, upring, 'upring istance is the same')
 
     instance.upring.on('up', function () {
-      let topic = 'hello'
+      let topic = 'helloCustom'
 
       // this is the instance upring
       for (let i = 0; i < maxInt && this.allocatedToMe(topic); i += 1) {
-        topic = 'hello' + i
+        topic = 'helloCustom' + i
       }
 
       expected.topic = topic
