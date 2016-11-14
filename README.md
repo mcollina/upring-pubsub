@@ -15,7 +15,7 @@ See [MQEmitter][mqemitter] for the actual API.
 ## Install
 
 ```
-npm i upring-pubsub
+npm i upring-pubsub --save
 ```
 
 ## Usage

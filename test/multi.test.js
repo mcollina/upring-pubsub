@@ -7,7 +7,7 @@ const UpringPubsub = require('..')
 const steed = require('steed')
 const maxInt = Math.pow(2, 32) - 1
 const timeout = 6000
-const joinTimeout = 2000
+const joinTimeout = 1000
 const logLevel = 'error'
 
 let peers = null
@@ -318,7 +318,7 @@ function start (test) {
   })
 
   test('move a deep subscription', { timeout: timeout * 2 }, (t) => {
-    t.plan(6)
+    t.plan(7)
 
     const toKill = UpringPubsub({
       base,
@@ -350,11 +350,22 @@ function start (test) {
       }
 
       expected.topic = topic
+      let count = 0
 
-      another.on(topic, (msg, cb) => {
+      const listener = (msg, cb) => {
+        count++
         t.deepEqual(msg, expected, 'msg match')
-        cb()
-      }, (err) => {
+        if (count === 2) {
+          another.removeListener(topic, listener, function () {
+            t.pass('removed listener')
+            cb()
+          })
+        } else {
+          cb()
+        }
+      }
+
+      another.on(topic, listener, (err) => {
         t.error(err)
         main.emit(expected, function () {
           t.pass('emitted')
