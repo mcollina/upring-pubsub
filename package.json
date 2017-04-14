@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcollina/upring-pubsub.git"
+    "url": "git+https://github.com/upringjs/upring-pubsub.git"
   },
   "keywords": [
     "upring",
@@ -26,9 +26,9 @@
   "author": "Matteo Collina <hello@matteocollina.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mcollina/upring-pubsub/issues"
+    "url": "https://github.com/upringjs/upring-pubsub/issues"
   },
-  "homepage": "https://github.com/mcollina/upring-pubsub#readme",
+  "homepage": "https://github.com/upringjs/upring-pubsub#readme",
   "devDependencies": {
     "coveralls": "^2.11.14",
     "farmhash": "^1.2.1",
