@@ -35,7 +35,8 @@
     "pre-commit": "^1.1.2",
     "snazzy": "^6.0.0",
     "standard": "^9.0.0",
-    "tap": "^10.0.0"
+    "tap": "^10.0.0",
+    "upring": "^0.16.0"
   },
   "dependencies": {
     "end-of-stream": "^1.1.0",
@@ -44,7 +45,6 @@
     "pump": "^1.0.1",
     "qlobber": "^0.7.0",
     "readable-stream": "^2.2.1",
-    "upring": "^0.14.4",
     "steed": "^1.1.3"
   }
 }

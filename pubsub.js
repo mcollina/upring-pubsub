@@ -1,6 +1,5 @@
 'use strict'
 
-const UpRing = require('upring')
 const mqemitter = require('mqemitter')
 const Receiver = require('./lib/receiver')
 const commands = require('./lib/commands')
@@ -8,29 +7,32 @@ const extractBase = require('./lib/extractBase')
 const untrack = Symbol('untrack')
 const upwrap = Symbol('upwrap')
 
-function UpRingPubSub (opts) {
+module.exports = function (upring, opts, next) {
+  if (upring.pubsub) {
+    return next(new Error('pubsub property already exist'))
+  }
+  upring.pubsub = new UpRingPubSub(upring, opts)
+  next()
+}
+
+function UpRingPubSub (upring, opts) {
   if (!(this instanceof UpRingPubSub)) {
-    return new UpRingPubSub(opts)
+    return new UpRingPubSub(upring, opts)
   }
 
   opts = opts || {}
 
-  this.upring = opts.upring || new UpRing(opts)
+  this.upring = upring
   this._internal = mqemitter(opts)
 
   this._receivers = new Map()
 
-  this.ready = false
   this.closed = false
 
   // expose the parent logger
   this.logger = this.upring.logger
 
   commands(this)
-
-  this.upring.on('up', () => {
-    this.ready = true
-  })
 
   this.upring.on('peerUp', (peer) => {
     // TODO maybe we should keep track of the wildcard
@@ -42,10 +44,8 @@ function UpRingPubSub (opts) {
       }
     }
   })
-}
 
-UpRingPubSub.prototype.whoami = function () {
-  return this.upring.whoami()
+  this.upring.on('close', this.close.bind(this, noop))
 }
 
 // do we have a wildcard?
@@ -63,7 +63,7 @@ Object.defineProperty(UpRingPubSub.prototype, 'current', {
 })
 
 UpRingPubSub.prototype.emit = function (msg, cb) {
-  if (!this.ready) {
+  if (!this.upring.isReady) {
     this.upring.once('up', this.emit.bind(this, msg, cb))
     return
   }
@@ -82,7 +82,7 @@ UpRingPubSub.prototype.emit = function (msg, cb) {
 }
 
 UpRingPubSub.prototype.on = function (topic, onMessage, done) {
-  if (!this.ready) {
+  if (!this.upring.isReady) {
     this.upring.once('up', this.on.bind(this, topic, onMessage, done))
     return
   }
@@ -154,7 +154,7 @@ UpRingPubSub.prototype.removeListener = function (topic, onMessage, done) {
 
 UpRingPubSub.prototype.close = function (cb) {
   cb = cb || noop
-  if (!this.ready) {
+  if (!this.upring.isReady) {
     this.upring.once('up', this.close.bind(this, cb))
     return
   }
@@ -170,13 +170,7 @@ UpRingPubSub.prototype.close = function (cb) {
 
   this.closed = true
 
-  this._internal.close(() => {
-    this.upring.close((err) => {
-      cb(err)
-    })
-  })
+  this._internal.close(cb)
 }
 
 function noop () {}
-
-module.exports = UpRingPubSub
