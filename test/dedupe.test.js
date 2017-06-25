@@ -1,19 +1,19 @@
 'use strict'
 
 const t = require('tap')
-const UpringPubsub = require('./helper').build
+const build = require('./helper').build
 const maxInt = Math.pow(2, 32) - 1
 
-const main = UpringPubsub()
+const main = build()
 
 t.tearDown(main.close.bind(main))
 
 t.plan(7)
 
-main.upring.on('up', () => {
+main.on('up', () => {
   t.pass('main up')
 
-  const peer = UpringPubsub(main)
+  const peer = build(main)
 
   t.tearDown(peer.close.bind(peer))
 
@@ -23,33 +23,33 @@ main.upring.on('up', () => {
     payload: { my: 'message' }
   }
 
-  peer.upring.on('up', function () {
+  peer.on('up', function () {
     t.pass('peer up')
 
     // this is the main upring
-    for (let i = 0; i < maxInt && main.upring.allocatedToMe(topic); i += 1) {
+    for (let i = 0; i < maxInt && main.allocatedToMe(topic); i += 1) {
       topic = 'hello/' + i
     }
 
     // topic is allocated to the peer
     expected.topic = topic
 
-    main.on('#', function (msg, cb) {
+    main.pubsub.on('#', function (msg, cb) {
       t.deepEqual(msg, expected, 'msg match 1')
       cb()
     }, (err) => {
       t.error(err)
 
-      main.on('hello/+', function (msg, cb) {
+      main.pubsub.on('hello/+', function (msg, cb) {
         t.deepEqual(msg, expected, 'msg match 2')
         cb()
       }, (err) => {
         t.error(err)
 
-        main.emit(expected, function () {
+        main.pubsub.emit(expected, function () {
           setTimeout(() => {
             t.pass('emitted')
-          }, UpringPubsub.joinTimeout * 2)
+          }, build.joinTimeout * 2)
         })
       })
     })

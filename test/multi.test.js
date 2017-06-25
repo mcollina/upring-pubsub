@@ -13,14 +13,17 @@ const logLevel = 'error'
 let peers = null
 let base = null
 
-const main = UpringPubsub({
+const main = UpRing({
   logLevel,
   hashring: {
     joinTimeout
   }
 })
+main.use(UpringPubsub, err => {
+  if (err) throw err
+})
 
-main.upring.on('up', () => {
+main.on('up', () => {
   let count = 0
   base = [main.whoami()]
   peers = [main]
@@ -30,18 +33,21 @@ main.upring.on('up', () => {
   }
 
   function launch () {
-    const peer = UpringPubsub({
+    const peer = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
     })
+    peer.use(UpringPubsub, err => {
+      if (err) throw err
+    })
     peers.push(peer)
-    peer.upring.on('up', () => {
+    peer.on('up', () => {
       base.push(peer.whoami())
     })
-    peer.upring.on('up', latch)
+    peer.on('up', latch)
   }
 
   function latch () {
@@ -60,12 +66,15 @@ function start (test) {
   test('pub sub on another instance', { timeout }, (t) => {
     t.plan(3)
 
-    const instance = UpringPubsub({
+    const instance = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
+    })
+    instance.use(UpringPubsub, err => {
+      if (err) throw err
     })
     t.tearDown(instance.close.bind(instance))
 
@@ -73,7 +82,7 @@ function start (test) {
       payload: { my: 'message' }
     }
 
-    instance.upring.on('up', function () {
+    instance.on('up', function () {
       let topic = 'hello'
 
       // this is the instance upring
@@ -83,12 +92,12 @@ function start (test) {
 
       expected.topic = topic
 
-      instance.on(topic, (msg, cb) => {
+      instance.pubsub.on(topic, (msg, cb) => {
         t.deepEqual(msg, expected, 'msg match')
         cb()
       }, (err) => {
         t.error(err)
-        instance.emit(expected, function () {
+        instance.pubsub.emit(expected, function () {
           t.pass('emitted')
         })
       })
@@ -98,12 +107,15 @@ function start (test) {
   test('deep # wildcards', { timeout }, (t) => {
     t.plan(3)
 
-    const instance = UpringPubsub({
+    const instance = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
+    })
+    instance.use(UpringPubsub, err => {
+      if (err) throw err
     })
     t.tearDown(instance.close.bind(instance))
 
@@ -111,7 +123,7 @@ function start (test) {
       payload: { my: 'message' }
     }
 
-    instance.upring.on('up', function () {
+    instance.on('up', function () {
       let topic = 'hello/0'
 
       for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
@@ -120,12 +132,12 @@ function start (test) {
 
       expected.topic = topic + '/something'
 
-      instance.on(topic + '/+', (msg, cb) => {
+      instance.pubsub.on(topic + '/+', (msg, cb) => {
         t.deepEqual(msg, expected, 'msg match')
         cb()
       }, (err) => {
         t.error(err)
-        instance.emit(expected, function () {
+        instance.pubsub.emit(expected, function () {
           t.pass('emitted')
         })
       })
@@ -135,12 +147,15 @@ function start (test) {
   test('deep # wildcard', { timeout }, (t) => {
     t.plan(3)
 
-    const instance = UpringPubsub({
+    const instance = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
+    })
+    instance.use(UpringPubsub, err => {
+      if (err) throw err
     })
     t.tearDown(instance.close.bind(instance))
 
@@ -148,7 +163,7 @@ function start (test) {
       payload: { my: 'message' }
     }
 
-    instance.upring.on('up', function () {
+    instance.on('up', function () {
       let topic = 'hello/0'
 
       for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
@@ -157,12 +172,12 @@ function start (test) {
 
       expected.topic = topic
 
-      instance.on(topic + '/#', (msg, cb) => {
+      instance.pubsub.on(topic + '/#', (msg, cb) => {
         t.deepEqual(msg, expected, 'msg match')
         cb()
       }, (err) => {
         t.error(err)
-        instance.emit(expected, function () {
+        instance.pubsub.emit(expected, function () {
           t.pass('emitted')
         })
       })
@@ -172,12 +187,15 @@ function start (test) {
   test('2nd level # wildcard', { timeout }, (t) => {
     t.plan(3)
 
-    const instance = UpringPubsub({
+    const instance = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
+    })
+    instance.use(UpringPubsub, err => {
+      if (err) throw err
     })
     t.tearDown(instance.close.bind(instance))
 
@@ -185,7 +203,7 @@ function start (test) {
       payload: { my: 'message' }
     }
 
-    instance.upring.on('up', function () {
+    instance.on('up', function () {
       let topic = 'hello/0'
 
       for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
@@ -194,12 +212,12 @@ function start (test) {
 
       expected.topic = topic
 
-      instance.on('hello/#', (msg, cb) => {
+      instance.pubsub.on('hello/#', (msg, cb) => {
         t.deepEqual(msg, expected, 'msg match')
         cb()
       }, (err) => {
         t.error(err)
-        instance.emit(expected, function () {
+        instance.pubsub.emit(expected, function () {
           t.pass('emitted')
         })
       })
@@ -209,12 +227,15 @@ function start (test) {
   test('2nd level + wildcard', { timeout }, (t) => {
     t.plan(3)
 
-    const instance = UpringPubsub({
+    const instance = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
+    })
+    instance.use(UpringPubsub, err => {
+      if (err) throw err
     })
     t.tearDown(instance.close.bind(instance))
 
@@ -222,7 +243,7 @@ function start (test) {
       payload: { my: 'message' }
     }
 
-    instance.upring.on('up', function () {
+    instance.on('up', function () {
       let topic = 'hello/0'
 
       for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
@@ -231,12 +252,12 @@ function start (test) {
 
       expected.topic = topic
 
-      instance.on('hello/+', (msg, cb) => {
+      instance.pubsub.on('hello/+', (msg, cb) => {
         t.deepEqual(msg, expected, 'msg match')
         cb()
       }, (err) => {
         t.error(err)
-        instance.emit(expected, function () {
+        instance.pubsub.emit(expected, function () {
           t.pass('emitted')
         })
       })
@@ -246,12 +267,15 @@ function start (test) {
   test('1st level # wildcard', { timeout }, (t) => {
     t.plan(3)
 
-    const instance = UpringPubsub({
+    const instance = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
+    })
+    instance.use(UpringPubsub, err => {
+      if (err) throw err
     })
     t.tearDown(instance.close.bind(instance))
 
@@ -259,7 +283,7 @@ function start (test) {
       payload: { my: 'message' }
     }
 
-    instance.upring.on('up', function () {
+    instance.on('up', function () {
       let topic = 'hello/0'
 
       for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
@@ -268,12 +292,12 @@ function start (test) {
 
       expected.topic = topic
 
-      instance.on('#', (msg, cb) => {
+      instance.pubsub.on('#', (msg, cb) => {
         t.deepEqual(msg, expected, 'msg match')
         cb()
       }, (err) => {
         t.error(err)
-        instance.emit(expected, function () {
+        instance.pubsub.emit(expected, function () {
           t.pass('emitted')
         })
       })
@@ -283,12 +307,15 @@ function start (test) {
   test('1st level + wildcard', { timeout }, (t) => {
     t.plan(3)
 
-    const instance = UpringPubsub({
+    const instance = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
+    })
+    instance.use(UpringPubsub, err => {
+      if (err) throw err
     })
     t.tearDown(instance.close.bind(instance))
 
@@ -296,7 +323,7 @@ function start (test) {
       payload: { my: 'message' }
     }
 
-    instance.upring.on('up', function () {
+    instance.on('up', function () {
       let topic = '0'
 
       for (let i = 1; i < maxInt && this.allocatedToMe(topic); i += 1) {
@@ -305,56 +332,12 @@ function start (test) {
 
       expected.topic = topic
 
-      instance.on('+', (msg, cb) => {
+      instance.pubsub.on('+', (msg, cb) => {
         t.deepEqual(msg, expected, 'msg match')
         cb()
       }, (err) => {
         t.error(err)
-        instance.emit(expected, function () {
-          t.pass('emitted')
-        })
-      })
-    })
-  })
-
-  test('works with a custom upring instance', { timeout }, (t) => {
-    t.plan(4)
-
-    const upring = new UpRing({
-      base,
-      logLevel,
-      hashring: {
-        joinTimeout
-      }
-    })
-
-    const instance = UpringPubsub({
-      upring
-    })
-    t.tearDown(instance.close.bind(instance))
-
-    const expected = {
-      payload: { my: 'message' }
-    }
-
-    t.equal(instance.upring, upring, 'upring istance is the same')
-
-    instance.upring.on('up', function () {
-      let topic = 'helloCustom'
-
-      // this is the instance upring
-      for (let i = 0; i < maxInt && this.allocatedToMe(topic); i += 1) {
-        topic = 'helloCustom' + i
-      }
-
-      expected.topic = topic
-
-      instance.on(topic, (msg, cb) => {
-        t.deepEqual(msg, expected, 'msg match')
-        cb()
-      }, (err) => {
-        t.error(err)
-        instance.emit(expected, function () {
+        instance.pubsub.emit(expected, function () {
           t.pass('emitted')
         })
       })
