@@ -2,6 +2,7 @@
 
 const tap = require('tap')
 const max = 5
+const UpRing = require('upring')
 const UpringPubsub = require('..')
 const steed = require('steed')
 const maxInt = Math.pow(2, 32) - 1
@@ -12,14 +13,17 @@ const logLevel = 'fatal'
 let peers = null
 let base = null
 
-const main = UpringPubsub({
+const main = UpRing({
   logLevel,
   hashring: {
     joinTimeout
   }
 })
+main.use(UpringPubsub, err => {
+  if (err) throw err
+})
 
-main.upring.on('up', () => {
+main.on('up', () => {
   let count = 0
   base = [main.whoami()]
   peers = [main]
@@ -29,18 +33,21 @@ main.upring.on('up', () => {
   }
 
   function launch () {
-    const peer = UpringPubsub({
+    const peer = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
     })
+    peer.use(UpringPubsub, err => {
+      if (err) throw err
+    })
     peers.push(peer)
-    peer.upring.on('up', () => {
+    peer.on('up', () => {
       base.push(peer.whoami())
     })
-    peer.upring.on('up', latch)
+    peer.on('up', latch)
   }
 
   function latch () {
@@ -59,12 +66,15 @@ function start (test) {
   test('move a deep subscription', { timeout: timeout * 2 }, (t) => {
     t.plan(7)
 
-    const another = UpringPubsub({
+    const another = UpRing({
       base,
       logLevel,
       hashring: {
         joinTimeout
       }
+    })
+    another.use(UpringPubsub, err => {
+      if (err) throw err
     })
     t.tearDown(another.close.bind(another))
 
@@ -72,17 +82,20 @@ function start (test) {
       payload: { my: 'message' }
     }
 
-    another.upring.on('up', function () {
-      const toKill = UpringPubsub({
+    another.on('up', function () {
+      const toKill = UpRing({
         base,
         logLevel,
         hashring: {
           joinTimeout
         }
       })
+      toKill.use(UpringPubsub, err => {
+        if (err) throw err
+      })
       t.tearDown(toKill.close.bind(toKill))
 
-      toKill.upring.on('up', function () {
+      toKill.on('up', function () {
         let topic = 'hello/0'
 
         for (let i = 0; i < maxInt && !this.allocatedToMe(topic); i += 1) {
@@ -103,7 +116,7 @@ function start (test) {
 
         function removeListener () {
           if (count === 2 && emitted) {
-            another.removeListener(topic, listener, function () {
+            another.pubsub.removeListener(topic, listener, function () {
               t.pass('removed listener')
             })
           }
@@ -117,7 +130,7 @@ function start (test) {
             expected.payload = 'another'
             t.comment('emitting')
             setTimeout(function () {
-              main.emit(expected, function () {
+              main.pubsub.emit(expected, function () {
                 t.pass('emitted')
                 emitted = true
                 removeListener()
@@ -126,18 +139,18 @@ function start (test) {
           }
         }
 
-        another.on(topic, listener, (err) => {
+        another.pubsub.on(topic, listener, (err) => {
           t.error(err)
-          main.emit(expected, function () {
+          main.pubsub.emit(expected, function () {
             t.pass('emitted')
 
-            another.upring.on('peerDown', function () {
+            another.on('peerDown', function () {
               t.comment('peerDown another')
               peerDown++
               emit()
             })
 
-            another.upring.on('peerDown', function () {
+            another.on('peerDown', function () {
               t.comment('peerDown main')
               peerDown++
               emit()
