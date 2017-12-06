@@ -4,11 +4,9 @@
 [![Build Status][travis-badge]][travis-url]
 [![Coverage Status][coveralls-badge]][coveralls-url]
 
-PubSub system built on top of an [UpRing][upring] consistent hashring.
-UpRingPubSub is consistently available, so it can lose messages when the topology changes.
+PubSub system built on top of an [UpRing][upring] consistent hashring.  
+You will get a pubsub system that is consistently available, so it can lose messages when the topology changes.  
 However, it is massively scalable.
-
-See [MQEmitter][mqemitter] for the actual API.
 
 [![js-standard-style](https://raw.githubusercontent.com/feross/standard/master/badge.png)](https://github.com/feross/standard)
 
@@ -21,47 +19,42 @@ npm i upring-pubsub --save
 ## Usage
 
 ```js
-'use strict'
-
-const UpRingPubsub = require('upring-pubsub')
-
-const broker = UpRingPubsub({
-  base: process.argv.slice(2)
+const upring = require('upring')({
+  base: process.argv.slice(2),
+  hashring: {
+    joinTimeout: 200
+  }
 })
 
-broker.on('#', function (msg, cb) {
-  console.log(msg)
-  cb()
-})
-
-broker.upring.on('up', function () {
-  console.log('copy and paste the following in a new terminal')
-  console.log('node example', this.whoami())
-})
+upring.use(require('upring-pubsub'))
 
 var count = 0
 
-setInterval(function () {
-  count++
-  broker.emit({
-    topic: 'hello',
-    count,
-    payload: `from ${process.pid}`
+upring.on('up', function () {
+  console.log('copy and paste the following in a new terminal')
+  console.log('node example', this.whoami())
+
+  upring.pubsub.on('hello/world', function (msg, cb) {
+    console.log(msg)
+    cb()
   })
-}, 1000)
+
+  setInterval(function () {
+    count++
+    upring.pubsub.emit({
+      topic: 'hello/world',
+      count,
+      pid: process.pid
+    })
+  }, 1000)
+})
 ```
 
 ## API
 
 ### new UpRingPubSub(opts)
 
-All the options of [UpRing][upring] and [MQEmitter][mqemitter],
-combined.
-
-UpRingPubSub specific options:
-
-* `upring`: an already initialized `UpRing` instance that has not
-  already emitted `'up'`
+See [MQEmitter][mqemitter] for the actual API.
 
 <a name="acknowledgements"></a>
 ## Acknowledgements
