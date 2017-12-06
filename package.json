@@ -33,6 +33,7 @@
     "coveralls": "^3.0.0",
     "farmhash": "^2.0.4",
     "pre-commit": "^1.2.2",
+    "safe-buffer": "^5.1.1",
     "snazzy": "^7.0.0",
     "standard": "^10.0.3",
     "tap": "^11.0.0",
