@@ -30,21 +30,21 @@
   },
   "homepage": "https://github.com/upringjs/upring-pubsub#readme",
   "devDependencies": {
-    "coveralls": "^2.11.14",
-    "farmhash": "^1.2.1",
-    "pre-commit": "^1.1.2",
-    "snazzy": "^6.0.0",
-    "standard": "^9.0.0",
-    "tap": "^10.0.0",
-    "upring": "^0.16.0"
+    "coveralls": "^3.0.0",
+    "farmhash": "^2.0.4",
+    "pre-commit": "^1.2.2",
+    "snazzy": "^7.0.0",
+    "standard": "^10.0.3",
+    "tap": "^11.0.0",
+    "upring": "^0.22.0"
   },
   "dependencies": {
-    "end-of-stream": "^1.1.0",
-    "hyperid": "^1.0.1",
-    "mqemitter": "^2.0.2",
-    "pump": "^1.0.1",
-    "qlobber": "^0.7.0",
-    "readable-stream": "^2.2.1",
+    "end-of-stream": "^1.4.0",
+    "hyperid": "^1.2.0",
+    "mqemitter": "^2.2.0",
+    "pump": "^2.0.0",
+    "qlobber": "^2.0.0",
+    "readable-stream": "^2.3.3",
     "steed": "^1.1.3"
   }
 }
