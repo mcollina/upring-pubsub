@@ -51,11 +51,11 @@ test('# subscription', { timeout }, (t) => {
 
           // needed to allow the connection
           // to establish
-          setImmediate(function () {
+          setTimeout(function () {
             peer.pubsub.emit(expected, function () {
               t.pass('emitted')
             })
-          })
+          }, 200)
         }
       }
 

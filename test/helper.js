@@ -13,15 +13,13 @@ function build (main) {
 
   const upring = UpRing({
     base,
-    logLevel: 'error',
+    logLevel: 'debug',
     hashring: {
       joinTimeout
     }
   })
 
-  upring.use(UpringPubsub, err => {
-    if (err) throw err
-  })
+  upring.use(UpringPubsub)
 
   return upring
 }

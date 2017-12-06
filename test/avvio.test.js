@@ -5,15 +5,12 @@ const UpRing = require('upring')
 const UpringPubsub = require('..')
 
 test('avvio lifecycle', t => {
-  t.plan(4)
+  t.plan(2)
   const upring = UpRing({
     logLevel: 'error'
   })
 
-  upring.use(UpringPubsub, err => {
-    t.error(err)
-    t.notOk(upring.isReady)
-  })
+  upring.use(UpringPubsub)
 
   upring.on('up', () => {
     t.ok(upring.isReady)
