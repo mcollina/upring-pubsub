@@ -13,7 +13,7 @@ function build (main) {
 
   const upring = UpRing({
     base,
-    logLevel: 'debug',
+    logLevel: 'silent',
     hashring: {
       joinTimeout
     }

@@ -7,7 +7,7 @@ const UpringPubsub = require('..')
 test('avvio lifecycle', t => {
   t.plan(2)
   const upring = UpRing({
-    logLevel: 'error'
+    logLevel: 'silent'
   })
 
   upring.use(UpringPubsub)
