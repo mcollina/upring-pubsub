@@ -30,7 +30,7 @@ function UpRingPubSub (upring, opts) {
   this.closed = false
 
   // expose the parent logger
-  this.logger = this.upring.logger
+  this.log = this.upring.log
 
   commands(this)
 
@@ -69,7 +69,7 @@ UpRingPubSub.prototype.emit = function (msg, cb) {
   }
 
   const key = extractBase(msg.topic)
-  const logger = this.logger
+  const log = this.log
   const data = {
     cmd: 'publish',
     ns: 'pubsub',
@@ -77,7 +77,7 @@ UpRingPubSub.prototype.emit = function (msg, cb) {
     msg
   }
 
-  logger.debug(data, 'sending request')
+  log.debug(data, 'sending request')
   this.upring.request(data, cb || noop)
 }
 
@@ -103,14 +103,14 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
   // data is already flowing through this instance
   // nothing to do
   if (this._receivers.has(topic)) {
-    this.logger.info({ topic }, 'subscription already setup')
+    this.log.info({ topic }, 'subscription already setup')
     this._receivers.get(topic).count++
     process.nextTick(done)
     return
   } else if (hasLowWildCard(topic)) {
     peers = this.upring.peers(false)
   } else if (this.upring.allocatedToMe(key)) {
-    this.logger.info({ topic }, 'local subscription')
+    this.log.info({ topic }, 'local subscription')
 
     onMessage[untrack] = this.upring.track(key).on('move', () => {
       // resubscribe if it is moved to someone else
@@ -118,7 +118,7 @@ UpRingPubSub.prototype.on = function (topic, onMessage, done) {
       setImmediate(() => {
         this.removeListener(topic, onMessage, () => {
           this.on(topic, onMessage, () => {
-            this.logger.info({ topic }, 'resubscribed because topic moved to another peer')
+            this.log.info({ topic }, 'resubscribed because topic moved to another peer')
           })
         })
       })
